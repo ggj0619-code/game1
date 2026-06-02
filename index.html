@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>히든 밤(Hidden Bomb) - 동형이의어 vs 다의어</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --success: #2ec4b6;
+            --danger: #e71d36;
+            --background: #f8f9fa;
+            --card-back: #3a405a;
+        }
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: var(--background);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #333; margin-bottom: 10px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+        .status-board {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #edf2f7;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .player-score {
+            font-size: 1.1rem;
+            padding: 8px 15px;
+            border-radius: 5px;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .player-score.active {
+            border: 2px solid var(--primary);
+            background: #ebf8ff;
+        }
+        .deck-info { background: #e2e8f0; padding: 8px 12px; border-radius: 5px; }
+        
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+        .dice-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 2px dashed #cbd5e0;
+        }
+        .dice {
+            width: 50px;
+            height: 50px;
+            background: var(--primary);
+            color: white;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-weight: bold;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:disabled { background-color: #cbd5e0; cursor: not-allowed; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        
+        /* 3x3 카드 그리드 */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+            perspective: 1000px;
+        }
+        .card-slot {
+            height: 160px;
+            position: relative;
+        }
+        .card {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+        }
+        .card.flipped { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .card-front {
+            background-color: var(--card-back);
+            color: white;
+            font-size: 2rem;
+        }
+        .card-back {
+            background-color: white;
+            transform: rotateY(180deg);
+            border: 3px solid var(--primary);
+        }
+        .card.homonym .card-back { border-color: #ff9f1c; background: #fff9db; }
+        .card.polyseme .card-back { border-color: #2ec4b6; background: #e6fffa; }
+        
+        .card-word { font-size: 1.6rem; font-weight: bold; margin-bottom: 5px; color: #2d3748; }
+        .card-type { font-size: 0.85rem; font-weight: bold; padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; color: white; }
+        .card.homonym .card-type { background-color: #ff9f1c; }
+        .card.polyseme .card-type { background-color: #2ec4b6; }
+        .card-meaning { font-size: 0.75rem; color: #4a5568; text-align: center; word-break: keep-all; line-height: 1.3; }
+        
+        .message-box {
+            background: #fffaf0;
+            border-left: 4px solid #dd6b20;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            min-height: 24px;
+            color: #dd6b20;
+            text-align: center;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .result-modal {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>💣 히든 밤 (Hidden Bomb) 게임</h1>
+    
+    <div class="game-container">
+        <!-- 상단 상태창 -->
+        <div class="status-board">
+            <div id="p1-score" class="player-score active">친구 A (남은 카드: 0장)</div>
+            <div id="deck-count" class="deck-info">남은 카드 더미: 18장</div>
+            <div id="p2-score" class="player-score">친구 B (남은 카드: 0장)</div>
+        </div>
+
+        <!-- 조작 및 주사위 패널 -->
+        <div class="control-panel">
+            <div class="dice-area">
+                <button id="btn-roll" class="btn-primary" onclick="rollDice()">주사위 굴리기</button>
+                <div id="dice-view" class="dice">-</div>
+            </div>
+            <button class="btn-danger" onclick="endGameManual()">게임 강제 종료 및 정산</button>
+        </div>
+
+        <!-- 실시간 안내 메시지 -->
+        <div id="msg-box" class="message-box">주사위를 굴려 게임을 시작해 주세요!</div>
+
+        <!-- 3x3 카드 배치판 -->
+        <div class="grid" id="game-grid">
+            <!-- 자바스크립트로 카드 슬롯 9개가 생성됩니다 -->
+        </div>
+    </div>
+
+    <!-- 결과 창 모달 -->
+    <div id="result-overlay" class="overlay">
+        <div class="result-modal">
+            <h2>🏆 게임 결과 발표 🏆</h2>
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+            <div id="result-text" style="font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; line-height: 1.6;"></div>
+            <button class="btn-primary" onclick="location.reload()">다시 게임하기</button>
+        </div>
+    </div>
+
+    <script>
+        // 전체 27장 데이터 세팅 (동형이의어 14장, 다의어 13장)
+        const allCards = [
+            // 동형이의어 (형태는 같으나 어원이 다르고 뜻이 완전히 다른 낱말)
+            { word: "밤", type: "homonym", ex: "① 캄캄한 밤이 되었다.<br>② 달콤한 군밤을 먹었다." },
+            { word: "배", type: "homonym", ex: "① 강 위에 배가 떠 있다.<br>② 맛있는 배를 깎아 먹자." },
+            { word: "눈", type: "homonym", ex: "① 하늘에서 흰 눈이 내린다.<br>② 먼 곳을 보니 눈이 아프다." },
+            { word: "말", type: "homonym", ex: "① 목장에서 말이 달린다.<br>② 친구와 바른 말로 대화해요." },
+            { word: "풀", type: "homonym", ex: "① 마당에 풀이 자란다.<br>② 가위와 풀로 종이를 붙이자." },
+            { word: "차", type: "homonym", ex: "① 도로에 차가 막힌다.<br>② 따뜻한 녹차 한 잔 마셔요." },
+            { word: "굴", type: "homonym", ex: "① 기차가 터널 굴을 지난다.<br>② 바다에서 자란 굴을 먹었다." },
+            { word: "매", type: "homonym", ex: "① 하늘을 나는 독수리와 매.<br>② 규칙을 어겨 매를 맞았다." },
+            { word: "벌", type: "homonym", ex: "① 꿀벌이 꽃에 앉았다.<br>② 숙제를 안 해서 벌을 받았다." },
+            { word: "다리", type: "homonym", ex: "① 한강 다리를 건넜다.<br>② 오래 달렸더니 다리가 아프다." },
+            { word: "김", type: "homonym", ex: "① 밥을 김에 싸서 먹었다.<br>② 주전자에서 김이 모락모락 난다." },
+            { word: "살", type: "homonym", ex: "① 내 나이는 열 살이다.<br>② 삼겹살의 살이 부드럽다." },
+            { word: "이", type: "homonym", ex: "① 밥을 먹고 이를 닦았다.<br>② 머리가 가려워 보니 이가 있었다." },
+            { word: "신", type: "homonym", ex: "① 새 신을 신고 뛰어보자.<br>② 그리스 신화에 나오는 신." },
+
+            // 다의어 (하나의 중심 의미에서 주변 의미로 확장된 낱말)
+            { word: "먹다", type: "polyseme", ex: "① 밥을 먹다. (음식)<br>② 나이를 먹다. (시간)<br>③ 마음을 먹다. (결심)" },
+            { word: "머리", type: "polyseme", ex: "① 머리가 아프다. (신체)<br>② 머리를 깎다. (머리카락)<br>③ 머리가 좋다. (지능)" },
+            { word: "손", type: "polyseme", ex: "① 손을 깨끗이 씻다. (신체)<br>② 일손이 부족하다. (노동)<br>③ 손을 끊다. (관계)" },
+            { word: "발", type: "polyseme", ex: "① 발이 커서 신발이 작다. (신체)<br>② 마당이 넓어 발이 넓다. (인맥)" },
+            { word: "깊다", type: "polyseme", ex: "① 강물이 매우 깊다. (물 깊이)<br>② 생각이 깊은 아이. (수준)" },
+            { word: "가볍다", type: "polyseme", ex: "① 깃털이 가볍다. (무게)<br>② 입이 가볍다. (말 행동)" },
+            { word: "무겁다", type: "polyseme", ex: "① 짐이 무겁다. (무게)<br>② 분위기가 무겁다. (상태)" },
+            { word: "풀다", type: "polyseme", ex: "① 매듭을 풀다. (결속)<br>② 수학 문제를 풀다. (해결)<br>③ 오해를 풀다. (마음)" },
+            { word: "걸다", type: "polyseme", ex: "① 옷을 옷걸이에 걸다. (위치)<br>② 전화를 걸다. (시도)<br>③ 싸움을 걸다. (행동)" },
+            { word: "잡다", type: "polyseme", ex: "① 물고기를 잡다. (포획)<br>② 손을 꼭 잡다. (소유)<br>③ 날짜를 잡다. (지정)" },
+            { word: "열다", type: "polyseme", ex: "① 창문을 열다. (개방)<br>② 회의를 열다. (개최)" },
+            { word: "끊다", type: "polyseme", ex: "① 실을 가위로 끊다. (절단)<br>② 나쁜 습관을 끊다. (중단)" },
+            { word: "따르다", type: "polyseme", ex: "① 졸졸 형을 따르다. (동행)<br>② 컵에 물을 따르다. (붓기)" }
+        ];
+
+        let deck = [];
+        let board = Array(9).fill(null);
+        let playerScores = [0, 0]; // Index 0: Player A, Index 1: Player B
+        let currentPlayer = 0; // 0 or 1
+        
+        let diceValue = 0;
+        let flippedIndicesThisTurn = [];
+        let gameState = "ROLL_WAIT"; // ROLL_WAIT, FLIP_WAIT, EVALUATING
+
+        // 셔플 함수
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 게임 초기화
+        function initGame() {
+            deck = shuffle([...allCards]);
+            // 보드판 9장 채우기
+            for (let i = 0; i < 9; i++) {
+                board[i] = deck.pop();
+            }
+            updateUI();
+            renderBoard();
+        }
+
+        // 보드판 그리기
+        function renderBoard() {
+            const gridEl = document.getElementById("game-grid");
+            gridEl.innerHTML = "";
+            
+            board.forEach((card, index) => {
+                const slot = document.createElement("div");
+                slot.className = "card-slot";
+                
+                if (card) {
+                    slot.innerHTML = `
+                        <div class="card ${card.type}" id="card-${index}" onclick="handleCardClick(${index})">
+                            <div class="card-face card-front">💣</div>
+                            <div class="card-face card-back">
+                                <div class="card-word">${card.word}</div>
+                                <div class="card-type">${card.type === 'homonym' ? '동형이의어' : '다의어'}</div>
+                                <div class="card-meaning">${card.ex}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    slot.innerHTML = `<div style="width:100%; height:100%; border:2px dashed #e2e8f0; border-radius:10px;"></div>`;
+                }
+                gridEl.appendChild(slot);
+            });
+        }
+
+        // UI 갱신
+        function updateUI() {
+            document.getElementById("p1-score").innerText = `친구 A (모은 카드: ${playerScores[0]}장)`;
+            document.getElementById("p2-score").innerText = `친구 B (모은 카드: ${playerScores[1]}장)`;
+            document.getElementById("deck-count").innerText = `남은 카드 더미: ${deck.length}장`;
+            
+            document.getElementById("p1-score").className = `player-score ${currentPlayer === 0 ? 'active' : ''}`;
+            document.getElementById("p2-score").className = `player-score ${currentPlayer === 1 ? 'active' : ''}`;
+        }
+
+        // 주사위 굴리기
+        function rollDice() {
+            if (gameState !== "ROLL_WAIT") return;
+
+            // 남은 보드의 카드 개수 파악
+            const availableCards = board.filter(c => c !== null).length;
+            if (availableCards === 0) {
+                endGame();
+                return;
+            }
+
+            // 1~4까지의 주사위 눈 (보드 위 남은 카드수보다 많이 나올 수 없음)
+            const maxDice = Math.min(4, availableCards);
+            diceValue = Math.floor(Math.random() * maxDice) + 1;
+            
+            document.getElementById("dice-view").innerText = diceValue;
+            gameState = "FLIP_WAIT";
+            flippedIndicesThisTurn = [];
+            
+            document.getElementById("btn-roll").disabled = true;
+            setMessage(`주사위 [${diceValue}]가 나왔습니다! 연속해서 ${diceValue}장의 카드를 뒤집으세요.`);
+        }
+
+        // 카드 클릭 핸들러
+        function handleCardClick(index) {
+            if (gameState !== "FLIP_WAIT") return;
+            if (flippedIndicesThisTurn.includes(index)) return; // 이미 이번 턴에 뒤집은 카드 제외
+
+            // 카드 뒤집기 시각 효과
+            const cardEl = document.getElementById(`card-${index}`);
+            cardEl.classList.add("flipped");
+            flippedIndicesThisTurn.push(index);
+
+            const flippedCards = flippedIndicesThisTurn.map(idx => board[idx]);
+            const currentCard = board[index];
+
+            // 1장 초과로 뒤집었을 때 첫 카드와 속성 비교 (실시간 실패 검증)
+            if (flippedCards.length > 1) {
+                const firstType = flippedCards[0].type;
+                if (currentCard.type !== firstType) {
+                    // 미스매치 실패 발생
+                    gameState = "EVALUATING";
+                    setMessage("❌ 실패! 다른 종류의 카드가 섞였습니다. 2초 후 카드가 원래대로 돌아갑니다.");
+                    setTimeout(() => {
+                        resetFlippedCards();
+                        switchTurn();
+                    }, 2000);
+                    return;
+                }
+            }
+
+            // 주사위 개수만큼 다 성공적으로 뒤집었을 경우
+            if (flippedIndicesThisTurn.length === diceValue) {
+                gameState = "EVALUATING";
+                const matchingType = flippedCards[0].type === 'homonym' ? '동형이의어' : '다의어';
+                setMessage(`🎉 성공! 모두 [${matchingType}]입니다. 카드를 획득합니다!`);
+                
+                setTimeout(() => {
+                    // 점수 획득 및 카드 수거
+                    playerScores[currentPlayer] += diceValue;
+                    
+                    // 빈자리 채우기
+                    flippedIndicesThisTurn.forEach(idx => {
+                        board[idx] = deck.length > 0 ? deck.pop() : null;
+                    });
+
+                    // 전체 카드 소진 여부 확인
+                    const remainingOnBoard = board.filter(c => c !== null).length;
+                    if (remainingOnBoard === 0) {
+                        endGame();
+                        return;
+                    }
+
+                    switchTurn();
+                }, 1500);
+            }
+        }
+
+        // 실패 시 카드 원상복구
+        function resetFlippedCards() {
+            flippedIndicesThisTurn.forEach(idx => {
+                const cardEl = document.getElementById(`card-${idx}`);
+                if (cardEl) cardEl.classList.remove("flipped");
+            });
+        }
+
+        // 턴 전환
+        function switchTurn() {
+            currentPlayer = currentPlayer === 0 ? 1 : 0;
+            gameState = "ROLL_WAIT";
+            flippedIndicesThisTurn = [];
+            diceValue = 0;
+            document.getElementById("dice-view").innerText = "-";
+            document.getElementById("btn-roll").disabled = false;
+            
+            updateUI();
+            renderBoard();
+            setMessage(`친구 ${currentPlayer === 0 ? 'A' : 'B'}의 차례입니다. 주사위를 굴려주세요.`);
+        }
+
+        // 메시지 설정
+        function setMessage(msg) {
+            document.getElementById("msg-box").innerHTML = msg;
+        }
+
+        // 강제 종료 버튼
+        function endGameManual() {
+            if (confirm("정말 게임을 종료하고 결과를 확인하시겠습니까?")) {
+                endGame();
+            }
+        }
+
+        // 게임 종료 및 정산
+        function endGame() {
+            let winnerText = "";
+            const scoreA = playerScores[0];
+            const scoreB = playerScores[1];
+
+            if (scoreA > scoreB) {
+                winnerText = `🏆 친구 A 승리! 🏆<br><span style='color:var(--primary)'>친구 A: ${scoreA}장</span> vs 친구 B: ${scoreB}장`;
+            } else if (scoreB > scoreA) {
+                winnerText = `🏆 친구 B 승리! 🏆<br>친구 A: ${scoreA}장 vs <span style='color:var(--primary)'>친구 B: ${scoreB}장</span>`;
+            } else {
+                winnerText = `🤝 사이좋게 비겼습니다! 🤝<br>친구 A: ${scoreA}장 vs 친구 B: ${scoreB}장`;
+            }
+
+            document.getElementById("result-text").innerHTML = winnerText;
+            document.getElementById("result-overlay").style.display = "flex";
+        }
+
+        // 게임 시작 실행
+        window.onload = initGame;
+    </script>
+</body>
+</html>
